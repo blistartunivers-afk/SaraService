@@ -8,6 +8,8 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
+import android.view.accessibility.AccessibilityManager
+import android.view.accessibility.AccessibilityServiceInfo
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
