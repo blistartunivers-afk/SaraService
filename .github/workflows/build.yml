@@ -46,7 +46,7 @@ jobs:
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
 
       - name: Cache Gradle packages
-        uses: actions/cache@0400d5f6440739b6645c3b8c41b2a0a8e8e8e8e8e  # v4
+        uses: actions/cache@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           path: |
             ~/.gradle/caches
