@@ -42,9 +42,6 @@ jobs:
           cmdline-tools: latest
           licenses: 'android-sdk-license-.+|google-gdk-license-.+'
 
-      - name: Accept Android SDK licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-
       - name: Cache Gradle packages
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
