@@ -33,6 +33,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.gson.Gson
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.io.BufferedReader
@@ -160,7 +161,9 @@ class SaraSocketService : Service() {
                 val writer = PrintWriter(OutputStreamWriter(socket.getOutputStream()), true)
                 
                 var line: String?
-                while (isRunning && !socket.isClosed && reader.readLine().also { line = it } != null) {
+                while (isRunning && !socket.isClosed) {
+                    line = reader.readLine()
+                    if (line == null) break
                     val response = processCommand(line.trim())
                     writer.println(response)
                 }
