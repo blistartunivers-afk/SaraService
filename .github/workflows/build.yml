@@ -40,6 +40,10 @@ jobs:
           ndk-version: r26c
           build-tools: 34.0.0
           cmdline-tools: latest
+          licenses: 'android-sdk-license-.+|google-gdk-license-.+'
+
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
 
       - name: Cache Gradle packages
         uses: actions/cache@v4
