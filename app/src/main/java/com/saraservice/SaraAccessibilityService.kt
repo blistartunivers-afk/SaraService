@@ -23,22 +23,23 @@ class SaraAccessibilityService : AccessibilityService() {
     private val gson = Gson()
     private val pendingActions = ConcurrentHashMap<String, (String) -> Unit>()
     
-    // Binder para comunicación con SaraSocketService
-    private val binder = AccessibilityBinder()
-    
-    inner class AccessibilityBinder : Binder() {
-        fun getService(): SaraAccessibilityService = this@SaraAccessibilityService
-    }
-    
-    override fun onBind(intent: Intent): IBinder {
-        return binder
+    companion object {
+        @Volatile private var instance: SaraAccessibilityService? = null
+        fun getInstance(): SaraAccessibilityService? = instance
     }
     
     override fun onCreate() {
         super.onCreate()
+        instance = this
         Log.d(TAG, "Accessibility Service created")
     }
-
+    
+    override fun onDestroy() {
+        instance = null
+        super.onDestroy()
+        Log.d(TAG, "Accessibility Service destroyed")
+    }
+    
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         // No necesitamos procesar eventos, solo servir como backend para actions
     }
@@ -77,128 +78,134 @@ class SaraAccessibilityService : AccessibilityService() {
             return callback(gson.toJson(mapOf("error" to "Texto no encontrado: $text", "found" to false)))
         }
         val node = nodes[0]
-        val result = performClick(node)
-        node.recycle()
+        val success = performClick(node)
         root.recycle()
-        callback(gson.toJson(mapOf("clicked" to result, "text" to text, "found" to true)))
+        callback(gson.toJson(mapOf("success" to success, "text" to text)))
     }
 
     fun findElement(text: String, callback: (String) -> Unit) {
         val root = rootInActiveWindow ?: return callback(gson.toJson(mapOf("error" to "No hay ventana activa")))
         val nodes = findNodesByText(root, text)
-        val results = nodes.map { node ->
-            val bounds = Rect()
-            node.getBoundsInScreen(bounds)
-            mapOf(
-                "text" to node.text.toString(),
-                "class" to node.className.toString(),
-                "bounds" to mapOf(
-                    "left" to bounds.left,
-                    "top" to bounds.top,
-                    "right" to bounds.right,
-                    "bottom" to bounds.bottom,
-                    "center_x" to (bounds.left + bounds.right) / 2,
-                    "center_y" to (bounds.top + bounds.bottom) / 2
-                ),
-                "clickable" to node.isClickable,
-                "enabled" to node.isEnabled
-            )
-        }
-        nodes.forEach { it.recycle() }
         root.recycle()
-        callback(gson.toJson(mapOf("elements" to results, "count" to results.size)))
-    }
-
-    fun tap(x: Int, y: Int, callback: (String) -> Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val gesture = android.accessibilityservice.GestureDescription.Builder()
-            val path = android.graphics.Path()
-            path.moveTo(x.toFloat(), y.toFloat())
-            path.lineTo(x.toFloat(), y.toFloat())
-            gesture.addStroke(android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 50))
-            val result = dispatchGesture(gesture.build(), object : AccessibilityService.GestureResultCallback() {
-                override fun onCompleted(gestureDescription: android.accessibilityservice.GestureDescription) {
-                    callback(gson.toJson(mapOf("tapped" to true, "x" to x, "y" to y)))
-                }
-                override fun onCancelled(gestureDescription: android.accessibilityservice.GestureDescription) {
-                    callback(gson.toJson(mapOf("tapped" to false, "error" to "Gesture cancelled", "x" to x, "y" to y)))
-                }
-            }, null)
-            if (!result) {
-                callback(gson.toJson(mapOf("tapped" to false, "error" to "No se pudo despachar gesture", "x" to x, "y" to y)))
-            }
-        } else {
-            callback(gson.toJson(mapOf("error" to "Requiere Android 7.0+", "tapped" to false)))
+        if (nodes.isEmpty()) {
+            return callback(gson.toJson(mapOf("error" to "Texto no encontrado: $text", "found" to false)))
         }
+        val node = nodes[0]
+        val bounds = Rect()
+        node.getBoundsInScreen(bounds)
+        callback(gson.toJson(mapOf(
+            "found" to true,
+            "text" to text,
+            "bounds" to mapOf(
+                "left" to bounds.left,
+                "top" to bounds.top,
+                "right" to bounds.right,
+                "bottom" to bounds.bottom,
+                "centerX" to bounds.exactCenterX(),
+                "centerY" to bounds.exactCenterY()
+            )
+        )))
     }
 
-    // ========== HELPERS ==========
+    fun tapScreen(x: Int, y: Int, callback: (String) -> Unit) {
+        val root = rootInActiveWindow ?: return callback(gson.toJson(mapOf("error" to "No hay ventana activa")))
+        val node = findNodeAtLocation(root, x, y)
+        if (node == null) {
+            root.recycle()
+            return callback(gson.toJson(mapOf("error" to "No hay elemento en ($x, $y)", "success" to false)))
+        }
+        val success = performClick(node)
+        node.recycle()
+        root.recycle()
+        callback(gson.toJson(mapOf("success" to success, "x" to x, "y" to y)))
+    }
+
+    fun getClipboardText(callback: (String) -> Unit) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+        callback(gson.toJson(mapOf("text" to text)))
+    }
+
+    fun setClipboardText(text: String, callback: (String) -> Unit) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("SaraService", text)
+        clipboard.primaryClip = clip
+        callback(gson.toJson(mapOf("success" to true)))
+    }
+
+    // ========== HELPER METHODS ==========
 
     private fun nodeToXml(node: AccessibilityNodeInfo, depth: Int): String {
-        val sb = StringBuilder()
         val indent = "  ".repeat(depth)
+        val className = node.className ?: "Unknown"
+        val nodeText = node.text ?: ""
+        val contentDesc = node.contentDescription ?: ""
         val bounds = Rect()
         node.getBoundsInScreen(bounds)
         
-        sb.append("$indent<node ")
-        sb.append("class=\"${node.className}\" ")
-        sb.append("text=\"${escapeXml(node.text.toString())}\" ")
-        sb.append("content_desc=\"${escapeXml(node.contentDescription.toString())}\" ")
-        sb.append("bounds=\"[$bounds.left,$bounds.top][$bounds.right,$bounds.bottom]\" ")
-        sb.append("clickable=\"${node.isClickable}\" ")
-        sb.append("enabled=\"${node.isEnabled}\" ")
-        sb.append("focusable=\"${node.isFocusable}\" ")
-        sb.append("scrollable=\"${node.isScrollable}\" ")
-        sb.append("long_clickable=\"${node.isLongClickable}\" ")
-        sb.append("password=\"${node.isPassword}\" ")
-        sb.append("visible=\"${node.isVisibleToUser}\" ")
+        val attrs = mutableListOf<String>()
+        attrs.add("class=\"$className\"")
+        if (nodeText.isNotEmpty()) attrs.add("text=\"$nodeText\"")
+        if (contentDesc.isNotEmpty()) attrs.add("content-desc=\"$contentDesc\"")
+        attrs.add("bounds=\"[$bounds.left,$bounds.top][$bounds.right,$bounds.bottom]\"")
+        attrs.add("clickable=\"${node.isClickable}\"")
+        attrs.add("enabled=\"${node.isEnabled}\"")
+        attrs.add("focusable=\"${node.isFocusable}\"")
+        attrs.add("scrollable=\"${node.isScrollable}\"")
+        attrs.add("long-clickable=\"${node.isLongClickable}\"")
+        attrs.add("password=\"${node.isPassword}\"")
+        attrs.add("selected=\"${node.isSelected}\"")
+        attrs.add("visible-to-user=\"${node.isVisibleToUser}\"")
         
-        val childCount = node.childCount
-        if (childCount > 0) {
-            sb.append(">\n")
-            for (i in 0 until childCount) {
-                val child = node.getChild(i)
-                if (child != null) {
-                    sb.append(nodeToXml(child, depth + 1))
-                    child.recycle()
-                }
-            }
-            sb.append("$indent</node>\n")
-        } else {
-            sb.append("/>\n")
+        val childrenXml = StringBuilder()
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            childrenXml.append(nodeToXml(child, depth + 1))
+            child.recycle()
         }
-        return sb.toString()
-    }
-
-    private fun escapeXml(text: String): String {
-        return text.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\"", "&quot;")
-            .replace("'", "&apos;")
-    }
-
-    private fun findNodesByText(node: AccessibilityNodeInfo, text: String): MutableList<AccessibilityNodeInfo> {
-        val results = mutableListOf<AccessibilityNodeInfo>()
-        val searchText = text.lowercase()
         
+        val attrsStr = attrs.joinToString(' ')
+        return if (childrenXml.isNotEmpty()) {
+            "$indent<node $attrsStr>\n${childrenXml}$indent</node>\n"
+        } else {
+            "$indent<node $attrsStr />\n"
+        }
+    }
+
+    private fun findNodesByText(node: AccessibilityNodeInfo, text: String): List<AccessibilityNodeInfo> {
+        val results = mutableListOf<AccessibilityNodeInfo>()
         fun search(n: AccessibilityNodeInfo) {
-            val nodeText = n.text?.toString()?.lowercase() ?: ""
-            val descText = n.contentDescription?.toString()?.lowercase() ?: ""
-            if (nodeText.contains(searchText) || descText.contains(searchText)) {
+            val nodeText = n.text?.toString() ?: ""
+            val nodeDesc = n.contentDescription?.toString() ?: ""
+            if (nodeText.contains(text, ignoreCase = true) || nodeDesc.contains(text, ignoreCase = true)) {
                 results.add(n)
-            } else {
-                for (i in 0 until n.childCount) {
-                    val child = n.getChild(i)
-                    if (child != null) {
-                        search(child)
-                        child.recycle()
-                    }
-                }
+            }
+            for (i in 0 until n.childCount) {
+                val child = n.getChild(i) ?: continue
+                search(child)
+                child.recycle()
             }
         }
         search(node)
         return results
+    }
+
+    private fun findNodeAtLocation(node: AccessibilityNodeInfo, x: Int, y: Int): AccessibilityNodeInfo? {
+        val bounds = Rect()
+        node.getBoundsInScreen(bounds)
+        if (bounds.contains(x, y)) {
+            for (i in node.childCount - 1 downTo 0) {
+                val child = node.getChild(i) ?: continue
+                val result = findNodeAtLocation(child, x, y)
+                if (result != null) {
+                    child.recycle()
+                    return result
+                }
+                child.recycle()
+            }
+            return node
+        }
+        return null
     }
 
     private fun performClick(node: AccessibilityNodeInfo): Boolean {
@@ -207,15 +214,6 @@ class SaraAccessibilityService : AccessibilityService() {
         } else {
             @Suppress("DEPRECATION")
             node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        }
-    }
-
-    companion object {
-        private var instance: SaraAccessibilityService? = null
-        fun getInstance(): SaraAccessibilityService? = instance
-        
-        init {
-            instance = this
         }
     }
 }
