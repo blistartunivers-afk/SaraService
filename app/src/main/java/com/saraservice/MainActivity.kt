@@ -115,8 +115,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun hasAccessibilityPermission(): Boolean {
-        val accessibilityManager = getSystemService(android.view.accessibility.AccessibilityManager::class.java)
-        val services = accessibilityManager.getEnabledAccessibilityServiceList(android.view.accessibility.AccessibilityServiceInfo.FEEDBACK_GENERIC)
+        val accessibilityManager = getSystemService(AccessibilityManager::class.java)
+        val services = accessibilityManager.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
         return services.any { it.id.contains("com.saraservice") }
     }
 

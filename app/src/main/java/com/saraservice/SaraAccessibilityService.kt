@@ -138,14 +138,14 @@ class SaraAccessibilityService : AccessibilityService() {
     private fun nodeToXml(node: AccessibilityNodeInfo, depth: Int): String {
         val indent = "  ".repeat(depth)
         val className = node.className ?: "Unknown"
-        val text = node.text ?: ""
+        val nodeText = node.text ?: ""
         val contentDesc = node.contentDescription ?: ""
         val bounds = Rect()
         node.getBoundsInScreen(bounds)
         
         val attrs = mutableListOf<String>()
         attrs.add("class=\"$className\"")
-        if (text.isNotEmpty()) attrs.add("text=\"$text\"")
+        if (nodeText.isNotEmpty()) attrs.add("text=\"$nodeText\"")
         if (contentDesc.isNotEmpty()) attrs.add("content-desc=\"$contentDesc\"")
         attrs.add("bounds=\"[$bounds.left,$bounds.top][$bounds.right,$bounds.bottom]\"")
         attrs.add("clickable=\"${node.isClickable}\"")
@@ -164,10 +164,11 @@ class SaraAccessibilityService : AccessibilityService() {
             child.recycle()
         }
         
+        val attrsStr = attrs.joinToString(' ')
         return if (childrenXml.isNotEmpty()) {
-            "$indent<node ${attrs.joinToString(' ')}>\n${childrenXml}$indent</node>\n"
+            "$indent<node $attrsStr>\n${childrenXml}$indent</node>\n"
         } else {
-            "$indent<node ${attrs.joinToString(' ')} />\n"
+            "$indent<node $attrsStr />\n"
         }
     }
 
