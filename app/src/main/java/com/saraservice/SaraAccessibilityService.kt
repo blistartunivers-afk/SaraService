@@ -40,11 +40,6 @@ class SaraAccessibilityService : AccessibilityService() {
         Log.d(TAG, "Accessibility Service destroyed")
     }
     
-    override fun onBind(intent: Intent): IBinder {
-        // AccessibilityService no usa binding tradicional
-        return null
-    }
-    
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         // No necesitamos procesar eventos, solo servir como backend para actions
     }
@@ -170,12 +165,9 @@ class SaraAccessibilityService : AccessibilityService() {
         }
         
         return if (childrenXml.isNotEmpty()) {
-            "$indent<node ${attrs.joinToString(" ")}>
-${childrenXml}$indent</node>
-"
+            "$indent<node ${attrs.joinToString(' ')}>\n${childrenXml}$indent</node>\n"
         } else {
-            "$indent<node ${attrs.joinToString(" ")} />
-"
+            "$indent<node ${attrs.joinToString(' ')} />\n"
         }
     }
 
