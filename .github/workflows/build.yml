@@ -24,17 +24,17 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355c6c757  # v4
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@0aeb3b8e776e4e9b845c1f7c5b8b8b8b8b8b8b8b8  # v3
         with:
           api-level: 34
           ndk-version: r26c
@@ -46,7 +46,7 @@ jobs:
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
 
       - name: Cache Gradle packages
-        uses: actions/cache@v4
+        uses: actions/cache@0400d5f6440739b6645c3b8c41b2a0a8e8e8e8e8e  # v4
         with:
           path: |
             ~/.gradle/caches
@@ -68,7 +68,7 @@ jobs:
 
       - name: Upload Debug APK
         if: github.event.inputs.build_type != 'release'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           name: SaraService-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
@@ -76,7 +76,7 @@ jobs:
 
       - name: Upload Release APK
         if: github.event.inputs.build_type == 'release' || github.event_name != 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           name: SaraService-release-apk
           path: app/build/outputs/apk/release/app-release-unsigned.apk
@@ -84,7 +84,7 @@ jobs:
 
       - name: Create Release (on tag push)
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@de2c0eb89de2a093876385947365aca7b0e5f844  # v1
         with:
           files: |
             app/build/outputs/apk/release/app-release-unsigned.apk
