@@ -42,7 +42,7 @@ jobs:
           api-level: 34
           ndk-version: r26c
           build-tools: 34.0.0
-          cmdline-tools: latest
+          cmdline-tools-version: 15859902
           licenses: 'android-sdk-license-.+|google-gdk-license-.+'
 
       - name: Clear Gradle cache
