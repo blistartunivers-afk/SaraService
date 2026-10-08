@@ -15,28 +15,39 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.google.gson.Gson
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 class SaraAccessibilityService : AccessibilityService() {
     private val TAG = "SaraAccessibilityService"
     private val gson = Gson()
     private val pendingActions = ConcurrentHashMap<String, (String) -> Unit>()
-    
-    // Binder para comunicación con SaraSocketService
+
     private val binder = AccessibilityBinder()
-    
+
     inner class AccessibilityBinder : Binder() {
         fun getService(): SaraAccessibilityService = this@SaraAccessibilityService
     }
-    
-    override fun onBind(intent: Intent): IBinder {
-        return binder
+
+    companion object {
+        @Volatile
+        private var instance: SaraAccessibilityService? = null
+
+        fun getInstance(): SaraAccessibilityService? = instance
     }
-    
+
     override fun onCreate() {
         super.onCreate()
+        instance = this
         Log.d(TAG, "Accessibility Service created")
+    }
+
+    override fun onDestroy() {
+        instance = null
+        super.onDestroy()
+        Log.d(TAG, "Accessibility Service destroyed")
+    }
+
+    override fun onBind(intent: Intent): IBinder {
+        return binder
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -50,7 +61,7 @@ class SaraAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.d(TAG, "Accessibility Service connected")
-        
+
         val info = AccessibilityServiceInfo().apply {
             eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
@@ -59,8 +70,6 @@ class SaraAccessibilityService : AccessibilityService() {
         }
         setServiceInfo(info)
     }
-
-    // ========== MÉTODOS PÚBLICOS PARA EL SOCKET SERVICE ==========
 
     fun getScreenXml(callback: (String) -> Unit) {
         val root = rootInActiveWindow ?: return callback(gson.toJson(mapOf("error" to "No hay ventana activa")))
@@ -116,14 +125,19 @@ class SaraAccessibilityService : AccessibilityService() {
             path.moveTo(x.toFloat(), y.toFloat())
             path.lineTo(x.toFloat(), y.toFloat())
             gesture.addStroke(android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 50))
-            val result = dispatchGesture(gesture.build(), object : AccessibilityService.GestureResultCallback() {
-                override fun onCompleted(gestureDescription: android.accessibilityservice.GestureDescription) {
-                    callback(gson.toJson(mapOf("tapped" to true, "x" to x, "y" to y)))
-                }
-                override fun onCancelled(gestureDescription: android.accessibilityservice.GestureDescription) {
-                    callback(gson.toJson(mapOf("tapped" to false, "error" to "Gesture cancelled", "x" to x, "y" to y)))
-                }
-            }, null)
+            val result = dispatchGesture(
+                gesture.build(),
+                object : AccessibilityService.GestureResultCallback() {
+                    override fun onCompleted(gestureDescription: android.accessibilityservice.GestureDescription) {
+                        callback(gson.toJson(mapOf("tapped" to true, "x" to x, "y" to y)))
+                    }
+
+                    override fun onCancelled(gestureDescription: android.accessibilityservice.GestureDescription) {
+                        callback(gson.toJson(mapOf("tapped" to false, "error" to "Gesture cancelled", "x" to x, "y" to y)))
+                    }
+                },
+                null
+            )
             if (!result) {
                 callback(gson.toJson(mapOf("tapped" to false, "error" to "No se pudo despachar gesture", "x" to x, "y" to y)))
             }
@@ -132,14 +146,25 @@ class SaraAccessibilityService : AccessibilityService() {
         }
     }
 
-    // ========== HELPERS ==========
+    fun getClipboardText(callback: (String) -> Unit) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+        callback(gson.toJson(mapOf("text" to text)))
+    }
+
+    fun setClipboardText(text: String, callback: (String) -> Unit) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("SaraService", text)
+        clipboard.primaryClip = clip
+        callback(gson.toJson(mapOf("success" to true)))
+    }
 
     private fun nodeToXml(node: AccessibilityNodeInfo, depth: Int): String {
         val sb = StringBuilder()
         val indent = "  ".repeat(depth)
         val bounds = Rect()
         node.getBoundsInScreen(bounds)
-        
+
         sb.append("$indent<node ")
         sb.append("class=\"${node.className}\" ")
         sb.append("text=\"${escapeXml(node.text.toString())}\" ")
@@ -152,7 +177,7 @@ class SaraAccessibilityService : AccessibilityService() {
         sb.append("long_clickable=\"${node.isLongClickable}\" ")
         sb.append("password=\"${node.isPassword}\" ")
         sb.append("visible=\"${node.isVisibleToUser}\" ")
-        
+
         val childCount = node.childCount
         if (childCount > 0) {
             sb.append(">\n")
@@ -181,7 +206,7 @@ class SaraAccessibilityService : AccessibilityService() {
     private fun findNodesByText(node: AccessibilityNodeInfo, text: String): MutableList<AccessibilityNodeInfo> {
         val results = mutableListOf<AccessibilityNodeInfo>()
         val searchText = text.lowercase()
-        
+
         fun search(n: AccessibilityNodeInfo) {
             val nodeText = n.text?.toString()?.lowercase() ?: ""
             val descText = n.contentDescription?.toString()?.lowercase() ?: ""
@@ -209,13 +234,5 @@ class SaraAccessibilityService : AccessibilityService() {
             node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         }
     }
-
-    companion object {
-        private var instance: SaraAccessibilityService? = null
-        fun getInstance(): SaraAccessibilityService? = instance
-        
-        init {
-            instance = this
-        }
-    }
 }
+

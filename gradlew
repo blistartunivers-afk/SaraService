@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 # Gradle startup script for UN*X
 
 # Attempt to set APP_HOME

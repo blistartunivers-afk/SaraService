@@ -54,7 +54,7 @@
                 android:id="@+id/accessibilityBtn"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="♿ Abrir Ajustes de Accesibilidad"
+                android:text="⚙ Abrir Ajustes de Accesibilidad"
                 android:layout_marginBottom="8dp"
                 android:backgroundTint="#FF9800" />
 
@@ -69,7 +69,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="\nPasos para activar control total:\n1. Dale a 'Solicitar Todos los Permisos'\n2. Activa 'Sara Accessibility' en Accesibilidad\n3. Permite 'Dibujar sobre otras apps'\n4. Pulsa 'Iniciar SaraService'\n5. Desde Termux: python3 -c "from sara_native_bridge import SaraNativeBridge; b=SaraNativeBridge(); print(b.get_screen())"
+                android:text="\nPasos para activar control total:\n1. Dale a 'Solicitar Todos los Permisos'\n2. Activa 'Sara Accessibility' en Accesibilidad\n3. Permite 'Dibujar sobre otras apps'\n4. Inicia el servicio"
                 android:textSize="12sp"
                 android:textColor="#666"
                 android:paddingTop="16dp" />

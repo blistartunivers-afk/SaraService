@@ -11,11 +11,15 @@ class SaraApplication : Application() {
     }
 
     companion object {
-        @Suppress("UNUSED_PARAMETER")
-        fun getContext(): Context = SaraApplication.instance!!
-        private var instance: SaraApplication? = null
-        init {
-            instance = this
+        @Volatile private var instance: SaraApplication? = null
+        fun getContext(): Context = instance ?: throw IllegalStateException("Application not initialized")
+        
+        fun setInstance(app: SaraApplication) {
+            instance = app
         }
+    }
+
+    init {
+        instance = this
     }
 }
