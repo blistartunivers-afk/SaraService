@@ -7,9 +7,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Rect
-import android.os.Binder
 import android.os.Build
-import android.os.IBinder
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -21,11 +19,6 @@ class SaraAccessibilityService : AccessibilityService() {
     private val gson = Gson()
     private val pendingActions = ConcurrentHashMap<String, (String) -> Unit>()
 
-    private val binder = AccessibilityBinder()
-
-    inner class AccessibilityBinder : Binder() {
-        fun getService(): SaraAccessibilityService = this@SaraAccessibilityService
-    }
 
     companion object {
         @Volatile
@@ -46,9 +39,6 @@ class SaraAccessibilityService : AccessibilityService() {
         Log.d(TAG, "Accessibility Service destroyed")
     }
 
-    override fun onBind(intent: Intent): IBinder {
-        return binder
-    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         // No necesitamos procesar eventos, solo servir como backend para actions
@@ -155,7 +145,7 @@ class SaraAccessibilityService : AccessibilityService() {
     fun setClipboardText(text: String, callback: (String) -> Unit) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("SaraService", text)
-        clipboard.primaryClip = clip
+        clipboard.setPrimaryClip(clip)
         callback(gson.toJson(mapOf("success" to true)))
     }
 
