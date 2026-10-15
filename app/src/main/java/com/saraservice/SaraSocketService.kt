@@ -15,6 +15,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.provider.Settings
 import android.telephony.SmsManager
 import android.telephony.TelephonyManager
 import android.util.Base64
@@ -338,15 +339,24 @@ class SaraSocketService : Service() {
         }
         return try {
             val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            // Campos restringidos (Android 10+): captura individual para que un fallo no mate toda la respuesta
+            val deviceId = runCatching { telephonyManager.deviceId }.getOrNull()
+            val simSerial = runCatching { telephonyManager.simSerialNumber }.getOrNull()
+            val networkType = runCatching { telephonyManager.networkType }.getOrNull()
+            val dataState = runCatching { telephonyManager.dataState }.getOrNull()
+            val callState = runCatching { telephonyManager.callState }.getOrNull()
+            // Identificador alternativo permitido sin permisos privilegiados
+            val androidId = runCatching { Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) }.getOrNull()
             gson.toJson(
                 mapOf(
-                    "device_id" to telephonyManager.deviceId,
-                    "sim_serial" to telephonyManager.simSerialNumber,
+                    "device_id" to deviceId,
+                    "android_id" to androidId,
+                    "sim_serial" to simSerial,
                     "network_operator" to telephonyManager.networkOperatorName,
-                    "network_type" to telephonyManager.networkType,
+                    "network_type" to networkType,
                     "phone_type" to telephonyManager.phoneType,
-                    "data_state" to telephonyManager.dataState,
-                    "call_state" to telephonyManager.callState
+                    "data_state" to dataState,
+                    "call_state" to callState
                 )
             )
         } catch (e: Exception) {

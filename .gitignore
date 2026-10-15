@@ -6,3 +6,10 @@
 *.secret
 secrets/
 *.bak*
+
+# --- Seguridad: artefactos y secretos (anadido por SARA 2026-10-15) ---
+.gradle/
+build/
+*.keystore
+*.jks
+headers_debug.log
